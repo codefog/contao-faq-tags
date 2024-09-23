@@ -15,6 +15,7 @@ namespace Codefog\FaqTagsBundle;
 use Codefog\TagsBundle\Manager\DefaultManager;
 use Codefog\TagsBundle\Tag;
 use Contao\CoreBundle\Framework\ContaoFramework;
+use Contao\CoreBundle\Routing\ContentUrlGenerator;
 use Contao\Input;
 use Contao\PageModel;
 
@@ -33,23 +34,12 @@ class FaqManager
      */
     public const URL_PARAMETER = 'tag';
 
-    /**
-     * @var ContaoFramework
-     */
-    private $framework;
-
-    /**
-     * @var DefaultManager
-     */
-    private $tagsManager;
-
-    /**
-     * FaqManager constructor.
-     */
-    public function __construct(ContaoFramework $framework, DefaultManager $tagsManager)
+    public function __construct(
+        private readonly ContentUrlGenerator $contentUrlGenerator,
+        private readonly ContaoFramework $framework,
+        private readonly DefaultManager $tagsManager,
+    )
     {
-        $this->framework = $framework;
-        $this->tagsManager = $tagsManager;
     }
 
     /**
@@ -65,7 +55,7 @@ class FaqManager
 
         /** @var Tag $tag */
         foreach ($tags as $tag) {
-            $return[] = $this->generateTag($tag, $this->generateTagUrl($pageId));
+            $return[] = $this->generateTag($tag, $pageId);
         }
 
         return $return;
@@ -74,7 +64,7 @@ class FaqManager
     /**
      * Generate a single tag.
      */
-    public function generateTag(Tag $tag, string $url = null): array
+    public function generateTag(Tag $tag, int $pageId = null): array
     {
         /** @var Input $inputAdapter */
         $inputAdapter = $this->framework->getAdapter(Input::class);
@@ -85,8 +75,8 @@ class FaqManager
         ];
 
         // Add the URL, if any
-        if (null !== $url) {
-            $data['url'] = sprintf($url, $tag->getData()['alias']);
+        if ($pageId && ($pageModel = PageModel::findByPk($pageId)) !== null) {
+            $data['url'] = $this->contentUrlGenerator->generate($pageModel, ['parameters' => $tag->getData()['alias']]);
         }
 
         $tagData = $tag->getData();
@@ -97,27 +87,6 @@ class FaqManager
         }
 
         return $data;
-    }
-
-    /**
-     * Generate the tag URL.
-     */
-    public function generateTagUrl(int $pageId = null): ?string
-    {
-        static $cache = [];
-
-        if (!\array_key_exists($pageId, $cache)) {
-            /** @var PageModel $pageModelAdapter */
-            $pageModelAdapter = $this->framework->getAdapter(PageModel::class);
-
-            if (null !== $pageId && ($pageModel = $pageModelAdapter->findPublishedById($pageId)) !== null) {
-                $cache[$pageId] = $pageModel->getFrontendUrl('/'.self::URL_PARAMETER.'/%s');
-            } else {
-                $cache[$pageId] = null;
-            }
-        }
-
-        return $cache[$pageId];
     }
 
     /**

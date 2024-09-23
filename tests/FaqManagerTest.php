@@ -68,32 +68,6 @@ class FaqManagerTest extends ContaoTestCase
         $this->assertArrayNotHasKey('count', $basicData);
     }
 
-    public function testGenerateTagUrl(): void
-    {
-        $pageModel = $this->createMock(PageModel::class);
-        $pageModel
-            ->method('getFrontendUrl')
-            ->willReturnCallback(static function ($alias) {
-                return 'page-alias'.$alias.'.html';
-            })
-        ;
-
-        $pageModelAdapter = $this->mockAdapter(['findPublishedById']);
-        $pageModelAdapter
-            ->method('findPublishedById')
-            ->willReturnOnConsecutiveCalls($pageModel, null)
-        ;
-
-        $faqManager = new FaqManager(
-            $this->mockContaoFramework([PageModel::class => $pageModelAdapter]),
-            $this->createMock(DefaultManager::class)
-        );
-
-        $this->assertEquals('page-alias/'.FaqManager::URL_PARAMETER.'/%s.html', $faqManager->generateTagUrl(123));
-        $this->assertNull($faqManager->generateTagUrl(456));
-        $this->assertNull($faqManager->generateTagUrl());
-    }
-
     public function testGetFaqTags(): void
     {
         $tagFinder = $this->createMock(TagFinder::class);
