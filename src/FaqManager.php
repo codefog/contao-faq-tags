@@ -76,7 +76,7 @@ class FaqManager
 
         // Add the URL, if any
         if ($pageId && ($pageModel = PageModel::findByPk($pageId)) !== null) {
-            $data['url'] = $this->contentUrlGenerator->generate($pageModel, ['parameters' => $tag->getData()['alias']]);
+            $data['url'] = $this->contentUrlGenerator->generate($pageModel, ['parameters' => sprintf('/%s/%s', self::URL_PARAMETER, $tag->getData()['alias'])]);
         }
 
         $tagData = $tag->getData();

@@ -26,7 +26,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 #[AsFrontendModule('faq_tag_list', category: 'faq', template: 'mod_faq_tag_list')]
-class FaqTagListModule extends AbstractFrontendModuleController
+class FaqTagListController extends AbstractFrontendModuleController
 {
     public function __construct(
         private readonly Connection $connection,

@@ -15,10 +15,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->bind('$tagsManager', service('codefog_tags.manager.codefog_faq'))
     ;
 
-    $services->load('Codefog\\FaqTagsBundle\\', __DIR__.'/../../*')
-        ->exclude([
-            __DIR__.'/../../FrontendModule',
-        ])
+    $services->load('Codefog\\FaqTagsBundle\\', __DIR__.'/../src')
+        ->exclude([__DIR__.'/../src/FrontendModule'])
     ;
 
     $services
