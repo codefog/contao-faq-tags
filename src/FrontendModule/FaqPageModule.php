@@ -17,6 +17,7 @@ use Contao\Environment;
 use Contao\FaqCategoryModel;
 use Contao\FaqModel;
 use Contao\FilesModel;
+use Contao\ModuleFaq;
 use Contao\ModuleFaqPage;
 use Contao\PageModel;
 use Contao\StringUtil;
@@ -34,13 +35,13 @@ class FaqPageModule extends ModuleFaqPage
     {
         // Filter items by tag
         if ($this->faq_allowTagFiltering && ($tag = $this->getCurrentTag()) !== null) {
-            $objFaq = $this->getFaqItemsByTag($tag, $this->faq_categories);
+            $objFaqs = $this->getFaqItemsByTag($tag, $this->faq_categories);
             $this->Template->tagsHeadline = sprintf($GLOBALS['TL_LANG']['MSC']['faqTagsHeadline'], $tag->getName());
         } else {
-            $objFaq = FaqModel::findPublishedByPids($this->faq_categories);
+            $objFaqs = FaqModel::findPublishedByPids($this->faq_categories);
         }
 
-        if (null === $objFaq) {
+        if (null === $objFaqs) {
             $this->Template->faq = [];
 
             return;
@@ -49,57 +50,79 @@ class FaqPageModule extends ModuleFaqPage
         /* @var PageModel $objPage */
         global $objPage;
 
+        $tags = [];
         $arrFaqs = array_fill_keys($this->faq_categories, []);
-        $projectDir = System::getContainer()->getParameter('kernel.project_dir');
 
         // Add FAQs
-        while ($objFaq->next()) {
+        foreach ($objFaqs as $objFaq)
+        {
             /** @var FaqModel $objFaq */
             $objTemp = (object) $objFaq->row();
 
-            // Clean the RTE output
-            $objTemp->answer = StringUtil::toHtml5($objFaq->answer);
-
-            $objTemp->answer = StringUtil::encodeEmail($objTemp->answer);
+            $objTemp->answer = StringUtil::encodeEmail($objFaq->answer);
             $objTemp->addImage = false;
+            $objTemp->addBefore = false;
 
             // Add an image
-            if ($objFaq->addImage && $objFaq->singleSRC) {
-                $objModel = FilesModel::findByUuid($objFaq->singleSRC);
+            if ($objFaq->addImage)
+            {
+                $figure = System::getContainer()
+                    ->get('contao.image.studio')
+                    ->createFigureBuilder()
+                    ->from($objFaq->singleSRC)
+                    ->setSize($objFaq->size)
+                    ->setOverwriteMetadata($objFaq->getOverwriteMetadata())
+                    ->setLightboxGroupIdentifier('lightbox[' . substr(md5('mod_faqpage_' . $objFaq->id), 0, 6) . ']')
+                    ->enableLightbox((bool) $objFaq->fullsize)
+                    ->buildIfResourceExists();
 
-                if (null !== $objModel && is_file($projectDir.'/'.$objModel->path)) {
-                    // Do not override the field now that we have a model registry (see #6303)
-                    $arrFaq = $objFaq->row();
-                    $arrFaq['singleSRC'] = $objModel->path;
-                    $strLightboxId = 'lightbox['.substr(md5('mod_faqpage_'.$objFaq->id), 0, 6).']'; // see #5810
-
-                    $this->addImageToTemplate($objTemp, $arrFaq, null, $strLightboxId, $objModel);
+                if (null !== $figure)
+                {
+                    $figure->applyLegacyTemplateData($objTemp, $objFaq->imagemargin, $objFaq->floating);
                 }
             }
 
-            $objTemp->enclosure = [];
+            $objTemp->enclosure = array();
 
             // Add enclosure
-            if ($objFaq->addEnclosure) {
+            if ($objFaq->addEnclosure)
+            {
                 $this->addEnclosuresToTemplate($objTemp, $objFaq->row());
             }
+
+            $strAuthor = '';
+
+            /** @var UserModel $objAuthor */
+            if (($objAuthor = $objFaq->getRelated('author')) instanceof UserModel)
+            {
+                $strAuthor = $objAuthor->name;
+            }
+
+            $objTemp->info = sprintf($GLOBALS['TL_LANG']['MSC']['faqCreatedBy'], Date::parse($objPage->dateFormat, $objFaq->tstamp), $strAuthor);
 
             // Add the tags
             if ($this->faq_showTags) {
                 $objTemp->tags = $this->getFaqTags($objFaq->current(), (int) $this->faq_tagsTargetPage);
             }
 
-            /** @var UserModel $objAuthor */
-            $objAuthor = $objFaq->getRelated('author');
-            $objTemp->info = sprintf($GLOBALS['TL_LANG']['MSC']['faqCreatedBy'], Date::parse($objPage->dateFormat, $objFaq->tstamp), $objAuthor->name);
-
             /** @var FaqCategoryModel $objPid */
             $objPid = $objFaq->getRelated('pid');
 
-            // Order by PID
+            if (empty($arrFaqs[$objFaq->pid]))
+            {
+                $arrFaqs[$objFaq->pid] = $objPid->row();
+            }
+
             $arrFaqs[$objFaq->pid]['items'][] = $objTemp;
-            $arrFaqs[$objFaq->pid]['headline'] = $objPid->headline;
-            $arrFaqs[$objFaq->pid]['title'] = $objPid->title;
+
+            $tags[] = 'contao.db.tl_faq.' . $objFaq->id;
+        }
+
+        // Tag the FAQs (see #2137)
+        if (System::getContainer()->has('fos_http_cache.http.symfony_response_tagger'))
+        {
+            $responseTagger = System::getContainer()->get('fos_http_cache.http.symfony_response_tagger');
+            $responseTagger->addTags($tags);
         }
 
         $arrFaqs = array_values(array_filter($arrFaqs));
@@ -120,5 +143,10 @@ class FaqPageModule extends ModuleFaqPage
         $this->Template->faq = $arrFaqs;
         $this->Template->request = Environment::get('indexFreeRequest');
         $this->Template->topLink = $GLOBALS['TL_LANG']['MSC']['backToTop'];
+
+        $this->Template->getSchemaOrgData = function () use ($objFaqs)
+        {
+            return ModuleFaq::getSchemaOrgData($objFaqs, '#/schema/faq/' . $this->id);
+        };
     }
 }
