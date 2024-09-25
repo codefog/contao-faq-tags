@@ -91,8 +91,7 @@ trait TagsTrait
      */
     protected function getFaqManager(): FaqManager
     {
-        /** @var FaqManager $faqManager */
-        return System::getContainer()->get('codefog_faq_tags.faq_manager');
+        return System::getContainer()->get(FaqManager::class);
     }
 
     /**

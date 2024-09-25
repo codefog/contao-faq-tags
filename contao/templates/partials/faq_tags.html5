@@ -3,7 +3,7 @@
         <?php foreach ($this->tags as $tag): ?>
             <li class="faq-tags__tag<?php if ($tag['isActive']): ?> faq-tags__tag--active<?php endif; ?>">
                 <?php if ($tag['url']): ?>
-                    <a href="<?= ampersand($tag['url']) ?>" class="faq-tags__link" title="<?= \Contao\StringUtil::specialchars($tag['name']) ?>">
+                    <a href="<?= \Contao\StringUtil::ampersand($tag['url']) ?>" class="faq-tags__link" title="<?= \Contao\StringUtil::specialchars($tag['name']) ?>">
                 <?php endif; ?>
 
                 <span class="faq-tags__name"><?= $tag['name'] ?></span>

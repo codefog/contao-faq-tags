@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Codefog\FaqTagsBundle\Test\DependencyInjection;
 
 use Codefog\FaqTagsBundle\DependencyInjection\CodefogFaqTagsExtension;
+use Codefog\FaqTagsBundle\FaqManager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
@@ -25,7 +26,7 @@ class CodefogFaqTagsExtensionTest extends TestCase
 
         $extension->load([], $container);
 
-        $this->assertTrue($container->hasDefinition('codefog_faq_tags.faq_manager'));
+        $this->assertTrue($container->hasDefinition(FaqManager::class));
         $this->assertTrue($container->hasDefinition('codefog_faq_tags.faq_tag_list_module'));
     }
 }

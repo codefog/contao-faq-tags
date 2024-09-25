@@ -47,11 +47,10 @@ class FaqPageModule extends ModuleFaqPage
             return;
         }
 
-        /* @var PageModel $objPage */
         global $objPage;
 
-        $tags = [];
-        $arrFaqs = array_fill_keys($this->faq_categories, []);
+        $tags = array();
+        $arrFaqs = array_fill_keys($this->faq_categories, array());
 
         // Add FAQs
         foreach ($objFaqs as $objFaq)
@@ -73,13 +72,10 @@ class FaqPageModule extends ModuleFaqPage
                     ->setSize($objFaq->size)
                     ->setOverwriteMetadata($objFaq->getOverwriteMetadata())
                     ->setLightboxGroupIdentifier('lightbox[' . substr(md5('mod_faqpage_' . $objFaq->id), 0, 6) . ']')
-                    ->enableLightbox((bool) $objFaq->fullsize)
+                    ->enableLightbox($objFaq->fullsize)
                     ->buildIfResourceExists();
 
-                if (null !== $figure)
-                {
-                    $figure->applyLegacyTemplateData($objTemp, $objFaq->imagemargin, $objFaq->floating);
-                }
+                $figure?->applyLegacyTemplateData($objTemp, null, $objFaq->floating);
             }
 
             $objTemp->enclosure = array();
@@ -92,25 +88,21 @@ class FaqPageModule extends ModuleFaqPage
 
             $strAuthor = '';
 
-            /** @var UserModel $objAuthor */
-            if (($objAuthor = $objFaq->getRelated('author')) instanceof UserModel)
+            if ($objAuthor = UserModel::findById($objFaq->author))
             {
                 $strAuthor = $objAuthor->name;
             }
 
-            $objTemp->info = sprintf($GLOBALS['TL_LANG']['MSC']['faqCreatedBy'], Date::parse($objPage->dateFormat, $objFaq->tstamp), $strAuthor);
+            $objTemp->info = \sprintf($GLOBALS['TL_LANG']['MSC']['faqCreatedBy'], Date::parse($objPage->dateFormat, $objFaq->tstamp), $strAuthor);
+
+            if (($objPid = FaqCategoryModel::findById($objFaq->pid)) && empty($arrFaqs[$objFaq->pid]))
+            {
+                $arrFaqs[$objFaq->pid] = $objPid->row();
+            }
 
             // Add the tags
             if ($this->faq_showTags) {
                 $objTemp->tags = $this->getFaqTags($objFaq->current(), (int) $this->faq_tagsTargetPage);
-            }
-
-            /** @var FaqCategoryModel $objPid */
-            $objPid = $objFaq->getRelated('pid');
-
-            if (empty($arrFaqs[$objFaq->pid]))
-            {
-                $arrFaqs[$objFaq->pid] = $objPid->row();
             }
 
             $arrFaqs[$objFaq->pid]['items'][] = $objTemp;
@@ -125,27 +117,11 @@ class FaqPageModule extends ModuleFaqPage
             $responseTagger->addTags($tags);
         }
 
-        $arrFaqs = array_values(array_filter($arrFaqs));
-        $limit_i = \count($arrFaqs) - 1;
-
-        // Add classes first, last, even and odd
-        for ($i = 0; $i <= $limit_i; ++$i) {
-            $class = ((0 === $i) ? 'first ' : '').(($i === $limit_i) ? 'last ' : '').((0 === $i % 2) ? 'even' : 'odd');
-            $arrFaqs[$i]['class'] = trim($class);
-            $limit_j = \count($arrFaqs[$i]['items']) - 1;
-
-            for ($j = 0; $j <= $limit_j; ++$j) {
-                $class = ((0 === $j) ? 'first ' : '').(($j === $limit_j) ? 'last ' : '').((0 === $j % 2) ? 'even' : 'odd');
-                $arrFaqs[$i]['items'][$j]->class = trim($class);
-            }
-        }
-
-        $this->Template->faq = $arrFaqs;
-        $this->Template->request = Environment::get('indexFreeRequest');
+        $this->Template->faq = array_values(array_filter($arrFaqs));
+        $this->Template->request = Environment::get('requestUri');
         $this->Template->topLink = $GLOBALS['TL_LANG']['MSC']['backToTop'];
 
-        $this->Template->getSchemaOrgData = function () use ($objFaqs)
-        {
+        $this->Template->getSchemaOrgData = function () use ($objFaqs) {
             return ModuleFaq::getSchemaOrgData($objFaqs, '#/schema/faq/' . $this->id);
         };
     }

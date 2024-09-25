@@ -15,45 +15,29 @@ namespace Codefog\FaqTagsBundle\Controller\FrontendModule;
 use Codefog\FaqTagsBundle\FaqManager;
 use Codefog\TagsBundle\Manager\DefaultManager;
 use Contao\CoreBundle\Controller\FrontendModule\AbstractFrontendModuleController;
-use Contao\CoreBundle\ServiceAnnotation\FrontendModule;
+use Contao\CoreBundle\DependencyInjection\Attribute\AsFrontendModule;
+use Contao\CoreBundle\Security\Authentication\Token\TokenChecker;
+use Contao\CoreBundle\Twig\FragmentTemplate;
 use Contao\ModuleModel;
 use Contao\StringUtil;
-use Contao\Template;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * @FrontendModule(value="faq_tag_list", category="faq", template="mod_faq_tag_list")
- */
-class FaqTagListModule extends AbstractFrontendModuleController
+#[AsFrontendModule('faq_tag_list', category: 'faq', template: 'mod_faq_tag_list')]
+class FaqTagListController extends AbstractFrontendModuleController
 {
-    /**
-     * @var Connection
-     */
-    private $connection;
-
-    /**
-     * @var FaqManager
-     */
-    private $faqManager;
-
-    /**
-     * @var DefaultManager
-     */
-    private $tagsManager;
-
-    /**
-     * FaqTagListModule constructor.
-     */
-    public function __construct(Connection $connection, FaqManager $faqManager, DefaultManager $tagsManager)
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly FaqManager $faqManager,
+        private readonly DefaultManager $tagsManager,
+        private readonly TokenChecker $tokenChecker,
+    )
     {
-        $this->connection = $connection;
-        $this->faqManager = $faqManager;
-        $this->tagsManager = $tagsManager;
     }
 
-    protected function getResponse(Template $template, ModuleModel $model, Request $request): ?Response
+    protected function getResponse(FragmentTemplate $template, ModuleModel $model, Request $request): Response
     {
         if (0 === \count($tags = $this->findTags($model))) {
             return new Response();
@@ -61,7 +45,7 @@ class FaqTagListModule extends AbstractFrontendModuleController
 
         $template->tags = $this->faqManager->generateTags($tags, (int) $model->faq_tagsTargetPage);
 
-        return new Response($template->parse());
+        return $template->getResponse();
     }
 
     /**
@@ -75,12 +59,12 @@ class FaqTagListModule extends AbstractFrontendModuleController
             return [];
         }
 
-        $isPreviewMode = \defined('BE_USER_LOGGED_IN') && BE_USER_LOGGED_IN === true;
+        $isPreviewMode = $this->tokenChecker->isPreviewMode();
 
         $faqIds = $this->connection->fetchAllAssociative(
             'SELECT id FROM tl_faq WHERE pid IN (?)'.(!$isPreviewMode ? ' AND published=?' : ''),
             $isPreviewMode ? [$faqCategories] : [$faqCategories, 1],
-            [Connection::PARAM_INT_ARRAY]
+            [ArrayParameterType::INTEGER]
         );
 
         if (0 === \count($faqIds)) {
